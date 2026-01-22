@@ -5,37 +5,38 @@
 }
 
 :root {
-    --primary-color: #007bff;
-    --primary-hover: #0056b3;
+    --primary-color: #4a90e2;
+    --primary-hover: #357abd;
     --secondary-color: #6c757d;
-    --success-color: #28a745;
-    --danger-color: #dc3545;
-    --warning-color: #ffc107;
-    --info-color: #17a2b8;
+    --success-color: #5cb85c;
+    --danger-color: #d9534f;
+    --warning-color: #f0ad4e;
+    --info-color: #5bc0de;
     
-    --bg-primary: #ffffff;
-    --bg-secondary: #f8f9fa;
-    --bg-tertiary: #e9ecef;
-    --text-primary: #212529;
-    --text-secondary: #6c757d;
-    --text-muted: #adb5bd;
-    --border-color: #dee2e6;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.12);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
-    --shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
+    /* 护眼配色方案 */
+    --bg-primary: #f5f5dc; /* 米白色背景 */
+    --bg-secondary: #f0f8e8; /* 浅绿色背景 */
+    --bg-tertiary: #e8f5e8; /* 更浅的绿色 */
+    --text-primary: #2d4a2b; /* 深绿色文字 */
+    --text-secondary: #5a7a5c; /* 中绿色文字 */
+    --text-muted: #8fa590; /* 浅绿色文字 */
+    --border-color: #c8d6c5; /* 淡绿色边框 */
+    --shadow-sm: 0 1px 3px rgba(45, 74, 43, 0.12);
+    --shadow-md: 0 4px 6px rgba(45, 74, 43, 0.1);
+    --shadow-lg: 0 10px 25px rgba(45, 74, 43, 0.1);
     
-    --message-user-bg: #007bff;
+    --message-user-bg: #4a90e2;
     --message-user-text: #ffffff;
-    --message-other-bg: #f1f3f4;
-    --message-other-text: #212529;
+    --message-other-bg: #e8f5e8;
+    --message-other-text: #2d4a2b;
     
     --transition-base: all 0.3s ease;
     --transition-fast: all 0.15s ease;
 }
 
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft YaHei', '微软雅黑', sans-serif;
+    background: linear-gradient(135deg, #e8f5e8 0%, #f0f8e8 50%, #f5f5dc 100%);
     min-height: 100vh;
     display: flex;
     align-items: center;
@@ -688,12 +689,19 @@ body {
 @media (max-width: 768px) {
     body {
         padding: 0;
+        -webkit-text-size-adjust: 100%;
+        -ms-text-size-adjust: 100%;
     }
     
     .chat-container {
         height: 100vh;
         max-height: 100vh;
         border-radius: 0;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
     }
     
     .message-content {
@@ -703,36 +711,57 @@ body {
     .input-container {
         flex-direction: column;
         gap: 8px;
+        padding: 12px;
     }
     
     .btn-send {
         width: 100%;
+        height: 48px;
+        font-size: 16px;
     }
     
     .modal-content {
         width: 95%;
         margin: 20px;
+        max-height: 90vh;
+        overflow-y: auto;
     }
     
     .emoji-picker {
         bottom: 100px;
         right: 10px;
         left: 10px;
+        max-height: 40vh;
+        overflow-y: auto;
     }
     
     .emoji-grid {
         grid-template-columns: repeat(6, 1fr);
+    }
+    
+    .search-container {
+        padding: 12px 16px;
+    }
+    
+    .header-actions {
+        gap: 4px;
+    }
+    
+    .btn-icon {
+        min-width: 44px;
+        min-height: 44px;
+        padding: 10px;
     }
 }
 
 @media (max-width: 480px) {
     .chat-header,
     .chat-footer {
-        padding: 16px;
+        padding: 12px;
     }
     
     .messages-container {
-        padding: 16px;
+        padding: 12px;
     }
     
     .user-details h1 {
@@ -746,10 +775,102 @@ body {
     }
     
     .header-actions {
-        gap: 4px;
+        gap: 2px;
     }
     
     .search-container {
-        padding: 12px 16px;
+        padding: 8px 12px;
+    }
+    
+    #message-input {
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: 12px;
+    }
+    
+    .input-actions {
+        padding-right: 4px;
+    }
+    
+    .btn-icon {
+        min-width: 40px;
+        min-height: 40px;
+        padding: 8px;
+    }
+    
+    .emoji-picker {
+        bottom: 120px;
+        padding: 8px;
+    }
+    
+    .emoji-grid {
+        grid-template-columns: repeat(5, 1fr);
+        gap: 2px;
+    }
+    
+    .emoji-item {
+        font-size: 20px;
+        padding: 6px;
+    }
+}
+
+/* Touch-friendly interactions */
+@media (hover: none) and (pointer: coarse) {
+    .btn-icon:hover {
+        background: var(--bg-tertiary);
+        transform: none;
+    }
+    
+    .emoji-item:hover {
+        background: var(--bg-secondary);
+        transform: none;
+    }
+    
+    .reaction:hover {
+        background: var(--bg-secondary);
+        transform: none;
+    }
+    
+    .search-result-item:hover {
+        background: var(--bg-tertiary);
+    }
+    
+    /* Add active states for touch */
+    .btn-icon:active {
+        background: var(--bg-tertiary);
+        transform: scale(0.95);
+    }
+    
+    .emoji-item:active {
+        background: var(--bg-secondary);
+        transform: scale(0.9);
+    }
+    
+    .reaction:active {
+        background: var(--bg-secondary);
+        transform: scale(0.95);
+    }
+}
+
+/* iOS Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+    .chat-container {
+        position: fixed;
+        width: 100%;
+        height: 100vh;
+        height: -webkit-fill-available;
+    }
+    
+    #message-input {
+        -webkit-appearance: none;
+        appearance: none;
+        border-radius: 0;
+    }
+}
+
+/* Android Chrome specific fixes */
+@media screen and (-webkit-min-device-pixel-ratio: 0) and (min-resolution: .001dpcm) {
+    .chat-container {
+        height: 100vh;
+        height: -webkit-fill-available;
     }
 }

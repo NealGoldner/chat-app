@@ -26,6 +26,7 @@ class ChatApp {
             usernameInput: document.getElementById('username'),
             themeSelect: document.getElementById('theme'),
             notificationsCheckbox: document.getElementById('notifications'),
+            soundEffectsCheckbox: document.getElementById('sound-effects'),
             userInitial: document.getElementById('user-initial'),
             emojiBtn: document.getElementById('emoji-btn'),
             attachBtn: document.getElementById('attach-btn'),
@@ -215,16 +216,21 @@ class ChatApp {
 
     generateAutoResponse() {
         const responses = [
-            "这是一个很有趣的问题！让我想想...",
-            "我理解你的意思。从我的角度来看...",
-            "谢谢你的分享！这让我想到了...",
-            "你说得对，我完全同意这个观点。",
-            "这个话题很值得深入讨论。",
-            "我能感受到你的热情！继续说下去吧。",
+            "这是一个很有趣的问题！让我仔细思考一下...",
+            "我理解您的意思。从我的角度来看...",
+            "感谢您的分享！这让我想到了...",
+            "您说得对，我完全同意这个观点。",
+            "这个话题很值得深入探讨。",
+            "我能感受到您的热情！请继续说下去吧。",
             "这确实是个复杂的问题，需要仔细考虑。",
-            "你的见解很独特，我学到了很多。",
+            "您的见解很独特，我学到了很多。",
             "让我们从另一个角度来看看这个问题。",
-            "我很高兴能和你讨论这个话题！"
+            "很高兴能和您讨论这个话题！",
+            "您的问题很有深度，让我来详细回答。",
+            "根据我的理解，情况是这样的...",
+            "这是一个很好的观察！",
+            "我明白您的担忧了。",
+            "让我为您详细解释一下。"
         ];
         
         const randomResponse = responses[Math.floor(Math.random() * responses.length)];
@@ -246,8 +252,8 @@ class ChatApp {
             welcomeDiv.className = 'welcome-message';
             welcomeDiv.innerHTML = `
                 <div class="welcome-content">
-                    <h2>欢迎使用对话网站！</h2>
-                    <p>我是您的AI助手，随时准备为您解答问题。请输入您想要讨论的话题。</p>
+                    <h2>欢迎使用智能对话助手！</h2>
+                    <p>我是您的AI聊天助手，随时准备为您提供帮助。请输入您想要讨论的话题或问题。</p>
                 </div>
             `;
             this.elements.messagesContainer.appendChild(welcomeDiv);
