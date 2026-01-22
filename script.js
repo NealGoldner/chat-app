@@ -16,6 +16,10 @@ class ChatApp {
         this.conversationCount = 0;
         this.lastUserMessageTime = 0;
         
+        // 双语功能
+        this.bilingualMode = true;
+        this.translationCache = new Map();
+        
         this.initializeElements();
         this.bindEvents();
         this.loadSettings();
@@ -202,7 +206,10 @@ class ChatApp {
             closeSearchBtn: document.getElementById('close-search-btn'),
             searchResults: document.getElementById('search-results'),
             voiceBtn: document.getElementById('voice-btn'),
-            emojiPicker: document.getElementById('emoji-picker')
+            emojiPicker: document.getElementById('emoji-picker'),
+            bilingualBtn: document.getElementById('bilingual-btn'),
+            bilingualModeCheckbox: document.getElementById('bilingual-mode'),
+            headerActions: document.querySelector('.header-actions')
         };
     }
 
@@ -222,6 +229,10 @@ class ChatApp {
         this.elements.voiceBtn.addEventListener('mousedown', this.startVoiceRecording.bind(this));
         this.elements.voiceBtn.addEventListener('mouseup', this.stopVoiceRecording.bind(this));
         this.elements.voiceBtn.addEventListener('mouseleave', this.stopVoiceRecording.bind(this));
+        
+        // 双语模式事件
+        this.elements.bilingualBtn.addEventListener('click', this.toggleBilingualMode.bind(this));
+        this.elements.bilingualModeCheckbox.addEventListener('change', this.updateBilingualMode.bind(this));
         
         // 聊天提示按钮事件
         document.querySelectorAll('.prompt-btn').forEach(btn => {
@@ -352,10 +363,29 @@ class ChatApp {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${message.sender}`;
         messageDiv.setAttribute('data-message-id', message.id);
+        
+        // 检查是否需要翻译
+        const needsTranslation = message.sender === 'other' && this.containsEnglish(message.text);
+        
         messageDiv.innerHTML = `
             <div class="message-content">
                 <div class="message-text">${this.escapeHtml(message.text)}</div>
+                ${needsTranslation ? '<div class="translation-section"></div>' : ''}
                 <span class="message-time">${this.formatTime(message.timestamp)}</span>
+                <div class="message-actions">
+                    ${needsTranslation && !this.bilingualMode ? `
+                        <button class="translate-btn" onclick="chatApp.translateMessage(${message.id})" title="翻译">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M5 8l6 6"></path>
+                                <path d="M4 14l6-6 2-3"></path>
+                                <path d="M2 5h12"></path>
+                                <path d="M7 2h1"></path>
+                                <path d="M22 22l-5-10-5 10"></path>
+                                <path d="M14 18h6"></path>
+                            </svg>
+                        </button>
+                    ` : ''}
+                </div>
                 <div class="message-reactions" id="reactions-${message.id}"></div>
             </div>
         `;
@@ -365,6 +395,13 @@ class ChatApp {
         
         // 添加趣味效果
         this.addFunMessageEffect(messageDiv);
+        
+        // 自动翻译（如果开启双语模式）
+        if (needsTranslation && this.bilingualMode) {
+            setTimeout(() => {
+                this.translateMessage(message.id);
+            }, 1000);
+        }
         
         // Add reaction functionality
         this.addMessageReactions(message.id);
@@ -659,15 +696,173 @@ class ChatApp {
         hints.forEach(hint => hint.remove());
     }
 
-    shouldStartGame(message) {
-        const gameKeywords = ['游戏', '玩', '猜', '谜语', '成语', '接龙', '20个问题'];
-        return gameKeywords.some(keyword => message.includes(keyword));
+    // 双语功能
+    toggleBilingualMode() {
+        this.bilingualMode = !this.bilingualMode;
+        this.elements.bilingualModeCheckbox.checked = this.bilingualMode;
+        this.updateBilingualButton();
+        
+        if (this.bilingualMode) {
+            this.showNotification("🌐 双语模式已开启，将自动显示中文翻译");
+            this.translateAllMessages();
+        } else {
+            this.showNotification("🌐 双语模式已关闭，点击翻译按钮查看中文");
+            this.hideAllTranslations();
+        }
+        
+        this.saveSettings();
+    }
+
+    updateBilingualMode() {
+        this.bilingualMode = this.elements.bilingualModeCheckbox.checked;
+        this.updateBilingualButton();
+        
+        if (this.bilingualMode) {
+            this.translateAllMessages();
+        } else {
+            this.hideAllTranslations();
+        }
+    }
+
+    updateBilingualButton() {
+        if (this.elements.bilingualBtn) {
+            this.elements.bilingualBtn.classList.toggle('active', this.bilingualMode);
+            this.elements.bilingualBtn.title = this.bilingualMode ? '关闭双语模式' : '开启双语模式';
+        }
+    }
+
+    containsEnglish(text) {
+        // 检查文本是否包含英文字符
+        return /[a-zA-Z]/.test(text) && !/^[\u4e00-\u9fa5\s\W]+$/.test(text);
+    }
+
+    async translateMessage(messageId) {
+        const message = this.messages.find(msg => msg.id === messageId);
+        if (!message || message.sender !== 'other') return;
+        
+        const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+        const translationSection = messageElement.querySelector('.translation-section');
+        const translateBtn = messageElement.querySelector('.translate-btn');
+        
+        if (!translationSection) return;
+        
+        // 检查缓存
+        const cacheKey = message.text;
+        if (this.translationCache.has(cacheKey)) {
+            this.displayTranslation(translationSection, this.translationCache.get(cacheKey), translateBtn);
+            return;
+        }
+        
+        // 显示加载状态
+        if (translateBtn) {
+            translateBtn.disabled = true;
+            translateBtn.innerHTML = '<div class="loading-spinner"></div>';
+        }
+        
+        translationSection.innerHTML = '<div class="translation-loading">正在翻译...</div>';
+        
+        try {
+            // 模拟翻译API调用
+            const translation = await this.simulateTranslation(message.text);
+            
+            // 缓存翻译结果
+            this.translationCache.set(cacheKey, translation);
+            
+            // 显示翻译
+            this.displayTranslation(translationSection, translation, translateBtn);
+            
+        } catch (error) {
+            console.error('Translation failed:', error);
+            translationSection.innerHTML = '<div class="translation-error">翻译失败，请重试</div>';
+        }
+    }
+
+    async simulateTranslation(text) {
+        // 模拟翻译延迟
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // 简单的翻译映射（实际应用中应该使用真正的翻译API）
+        const translations = {
+            "Wow! This question is interesting~ Let me think... 🤔": "哇！这个问题好有趣~ 让我想想... 🤔",
+            "Hehe, you've asked the right question! I think it's like this... 😄": "嘿嘿，你问到点子上了！我觉得是这样的... 😄",
+            "Oh, this question reminds me of something interesting I saw yesterday!": "哎呀，这个问题让我想起了昨天看到的一个有趣的事情！",
+            "Let me analyze this with my super brain... 🧠✨": "让我用我的超级大脑来分析一下... 🧠✨",
+            "This question has depth! But I think we can look at it in a simpler way~": "这个问题很有深度！不过我觉得我们可以用更简单的方式来看待它~",
+            "This question... I think the answer might be hidden in the fridge! 🍔": "这个问题嘛... 我觉得答案可能藏在冰箱里！🍔",
+            "Let me check my database... Oh wait, I think I forgot the password! 😅": "让我查查我的数据库... 哦等等，我好像把密码忘了！😅",
+            "Did you know? This question reminds me of my grandma's recipe!": "你知道吗？这个问题让我想起了我奶奶的菜谱！",
+            "This question is so hard... I need a cup of coffee to answer! ☕": "这个问题好难啊... 我需要喝杯咖啡才能回答！☕",
+            "Let me think... If I were you, I'd eat an ice cream first and then think about this question! 🍦": "让我想想... 如果我是你，我会先吃个冰淇淋再思考这个问题！🍦"
+        };
+        
+        // 如果有预定义翻译，使用它；否则返回模拟翻译
+        if (translations[text]) {
+            return translations[text];
+        }
+        
+        // 模拟翻译（简单处理）
+        return `[中文翻译] ${text}`;
+    }
+
+    displayTranslation(translationSection, translation, translateBtn) {
+        translationSection.innerHTML = `
+            <div class="translation-text">
+                <div class="translation-label">🇨🇳 中文翻译：</div>
+                <div class="translation-content">${this.escapeHtml(translation)}</div>
+            </div>
+        `;
+        
+        if (translateBtn) {
+            translateBtn.disabled = false;
+            translateBtn.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 11l3 3L22 4"></path>
+                    <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+                </svg>
+            `;
+            translateBtn.title = '翻译完成';
+        }
+    }
+
+    translateAllMessages() {
+        const otherMessages = this.messages.filter(msg => msg.sender === 'other' && this.containsEnglish(msg.text));
+        
+        otherMessages.forEach((message, index) => {
+            setTimeout(() => {
+                this.translateMessage(message.id);
+            }, index * 200); // 间隔200ms翻译，避免同时请求过多
+        });
+    }
+
+    hideAllTranslations() {
+        const translationSections = document.querySelectorAll('.translation-section');
+        translationSections.forEach(section => {
+            section.innerHTML = '';
+        });
+        
+        // 重置翻译按钮
+        const translateBtns = document.querySelectorAll('.translate-btn');
+        translateBtns.forEach(btn => {
+            btn.disabled = false;
+            btn.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 8l6 6"></path>
+                    <path d="M4 14l6-6 2-3"></path>
+                    <path d="M2 5h12"></path>
+                    <path d="M7 2h1"></path>
+                    <path d="M22 22l-5-10-5 10"></path>
+                    <path d="M14 18h6"></path>
+                </svg>
+            `;
+            btn.title = '翻译';
+        });
     }
 
     startMiniGame(userMessage) {
         const games = [
             "太好了！我们来玩猜谜语游戏吧！我先出一个：什么东西越洗越脏？🤔",
             "成语接龙开始！我先来：一帆风顺！该你了！🎯",
+            // ... (其他游戏选项)
             "20个问题游戏！你想一个东西，我可以用20个是/否问题来猜出来！准备好了吗？🎲",
             "文字游戏！用'聊天'的最后一个字'天'开头说一个词！我先来：天空！☁️",
             "猜数字游戏！我想了一个1-100的数字，你来猜！🎯"
@@ -937,69 +1132,51 @@ class ChatApp {
     }
 
     saveSettings() {
-        const newUsername = this.elements.usernameInput.value.trim();
-        const theme = this.elements.themeSelect.value;
-        const notifications = this.elements.notificationsCheckbox.checked;
-        
-        if (newUsername) {
-            this.username = newUsername;
-            this.updateUserInitial();
-        }
-        
-        this.applyTheme(theme);
-        
         const settings = {
-            username: this.username,
-            theme: theme,
-            notifications: notifications
+            username: this.elements.usernameInput.value,
+            bilingualMode: this.elements.bilingualModeCheckbox.checked,
+            theme: this.elements.themeSelect.value,
+            notifications: this.elements.notificationsCheckbox.checked,
+            soundEffects: this.elements.soundEffectsCheckbox.checked,
+            funMode: this.funMode
         };
         
-        localStorage.setItem('chatSettings', JSON.stringify(settings));
+        localStorage.setItem('chatAppSettings', JSON.stringify(settings));
         
-        if (notifications) {
-            this.showNotification('设置已保存');
-        }
+        this.username = settings.username;
+        this.bilingualMode = settings.bilingualMode;
+        
+        this.updateUserInitial();
+        this.updateBilingualButton();
+        this.applyTheme(settings.theme);
         
         this.closeSettings();
+        this.showNotification('设置已保存');
     }
 
-    loadSettings() {
-        const savedSettings = localStorage.getItem('chatSettings');
-        
-        if (savedSettings) {
-            const settings = JSON.parse(savedSettings);
-            this.username = settings.username || '用户';
-            this.elements.usernameInput.value = this.username;
-            this.elements.themeSelect.value = settings.theme || 'light';
-            this.elements.notificationsCheckbox.checked = settings.notifications !== false;
-            
-            this.applyTheme(settings.theme || 'light');
-        }
+applyTheme(theme) {
+    if (theme === 'dark') {
+        document.documentElement.style.setProperty('--bg-primary', '#1a1a1a');
+        document.documentElement.style.setProperty('--bg-secondary', '#2d2d2d');
+        document.documentElement.style.setProperty('--bg-tertiary', '#404040');
+        document.documentElement.style.setProperty('--text-primary', '#ffffff');
+        document.documentElement.style.setProperty('--text-secondary', '#b0b0b0');
+        document.documentElement.style.setProperty('--text-muted', '#808080');
+        document.documentElement.style.setProperty('--border-color', '#404040');
+        document.documentElement.style.setProperty('--message-other-bg', '#2d2d2d');
+        document.documentElement.style.setProperty('--message-other-text', '#ffffff');
+    } else {
+        document.documentElement.style.setProperty('--bg-primary', '#ffffff');
+        document.documentElement.style.setProperty('--bg-secondary', '#f8f9fa');
+        document.documentElement.style.setProperty('--bg-tertiary', '#e9ecef');
+        document.documentElement.style.setProperty('--text-primary', '#212529');
+        document.documentElement.style.setProperty('--text-secondary', '#6c757d');
+        document.documentElement.style.setProperty('--text-muted', '#adb5bd');
+        document.documentElement.style.setProperty('--border-color', '#dee2e6');
+        document.documentElement.style.setProperty('--message-other-bg', '#f1f3f4');
+        document.documentElement.style.setProperty('--message-other-text', '#212529');
     }
-
-    applyTheme(theme) {
-        if (theme === 'dark') {
-            document.documentElement.style.setProperty('--bg-primary', '#1a1a1a');
-            document.documentElement.style.setProperty('--bg-secondary', '#2d2d2d');
-            document.documentElement.style.setProperty('--bg-tertiary', '#404040');
-            document.documentElement.style.setProperty('--text-primary', '#ffffff');
-            document.documentElement.style.setProperty('--text-secondary', '#b0b0b0');
-            document.documentElement.style.setProperty('--text-muted', '#808080');
-            document.documentElement.style.setProperty('--border-color', '#404040');
-            document.documentElement.style.setProperty('--message-other-bg', '#2d2d2d');
-            document.documentElement.style.setProperty('--message-other-text', '#ffffff');
-        } else {
-            document.documentElement.style.setProperty('--bg-primary', '#ffffff');
-            document.documentElement.style.setProperty('--bg-secondary', '#f8f9fa');
-            document.documentElement.style.setProperty('--bg-tertiary', '#e9ecef');
-            document.documentElement.style.setProperty('--text-primary', '#212529');
-            document.documentElement.style.setProperty('--text-secondary', '#6c757d');
-            document.documentElement.style.setProperty('--text-muted', '#adb5bd');
-            document.documentElement.style.setProperty('--border-color', '#dee2e6');
-            document.documentElement.style.setProperty('--message-other-bg', '#f1f3f4');
-            document.documentElement.style.setProperty('--message-other-text', '#212529');
-        }
-    }
+}
 
     updateUserInitial() {
         const initial = this.username.charAt(0).toUpperCase();

@@ -382,6 +382,111 @@ body {
     background: rgba(255, 255, 255, 0.3);
 }
 
+/* 翻译功能样式 */
+.translation-section {
+    margin-top: 8px;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    border-left: 3px solid var(--primary-color);
+    animation: fadeIn 0.3s ease;
+}
+
+.translation-text {
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.translation-label {
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 4px;
+    font-size: 12px;
+}
+
+.translation-content {
+    color: var(--text-primary);
+    word-wrap: break-word;
+}
+
+.translation-loading {
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 13px;
+}
+
+.translation-error {
+    color: var(--danger-color, #dc3545);
+    font-size: 13px;
+}
+
+.message-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    opacity: 0;
+    transition: var(--transition-fast);
+}
+
+.message:hover .message-actions {
+    opacity: 1;
+}
+
+.translate-btn {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 6px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.translate-btn:hover {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.translate-btn:hover svg {
+    stroke: white;
+}
+
+.translate-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.loading-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 双语按钮样式 */
+.btn-icon.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-icon.active:hover {
+    background: var(--primary-hover, #0056b3);
+}
+
 /* 中国区浏览器优化 */
 .chat-container {
     width: 100%;
