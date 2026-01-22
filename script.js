@@ -5,11 +5,168 @@ class ChatApp {
         this.isTyping = false;
         this.typingTimeout = null;
         this.autoResponseTimeout = null;
+        this.funMode = false;
+        this.emojiRainInterval = null;
         
         this.initializeElements();
         this.bindEvents();
         this.loadSettings();
         this.initializeChat();
+        this.initFunMode();
+    }
+
+    initFunMode() {
+        // 随机启动趣味模式
+        if (Math.random() > 0.7) {
+            this.enableFunMode();
+        }
+        
+        // 添加趣味模式切换按钮
+        this.addFunModeToggle();
+    }
+
+    addFunModeToggle() {
+        const funBtn = document.createElement('button');
+        funBtn.className = 'btn-icon fun-toggle';
+        funBtn.id = 'fun-mode-btn';
+        funBtn.title = '趣味模式';
+        funBtn.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                <path d="M2 12h2"></path>
+                <path d="M20 12h2"></path>
+                <path d="M12 2v2"></path>
+                <path d="M12 20v2"></path>
+            </svg>
+        `;
+        
+        this.elements.headerActions.appendChild(funBtn);
+        this.elements.funBtn = funBtn;
+        
+        funBtn.addEventListener('click', () => this.toggleFunMode());
+    }
+
+    toggleFunMode() {
+        this.funMode = !this.funMode;
+        document.body.classList.toggle('fun-mode', this.funMode);
+        
+        if (this.funMode) {
+            this.enableFunMode();
+            this.showNotification("🎉 趣味模式已开启！准备好享受有趣的聊天吧！");
+        } else {
+            this.disableFunMode();
+            this.showNotification("趣味模式已关闭");
+        }
+    }
+
+    enableFunMode() {
+        this.funMode = true;
+        document.body.classList.add('fun-mode');
+        
+        // 添加趣味样式到现有元素
+        this.elements.typingIndicator.classList.add('fun-mode');
+        this.elements.sendBtn.classList.add('fun-mode');
+        this.elements.emojiBtn.classList.add('fun-mode');
+        
+        // 启动表情雨
+        this.startEmojiRain();
+        
+        // 添加趣味效果到欢迎消息
+        const welcomeMsg = document.querySelector('.welcome-message');
+        if (welcomeMsg) {
+            welcomeMsg.classList.add('fun-mode');
+        }
+    }
+
+    disableFunMode() {
+        this.funMode = false;
+        document.body.classList.remove('fun-mode');
+        
+        // 移除趣味样式
+        this.elements.typingIndicator.classList.remove('fun-mode');
+        this.elements.sendBtn.classList.remove('fun-mode');
+        this.elements.emojiBtn.classList.remove('fun-mode');
+        
+        const welcomeMsg = document.querySelector('.welcome-message');
+        if (welcomeMsg) {
+            welcomeMsg.classList.remove('fun-mode');
+        }
+        
+        // 停止表情雨
+        this.stopEmojiRain();
+    }
+
+    startEmojiRain() {
+        if (this.emojiRainInterval) return;
+        
+        this.emojiRainInterval = setInterval(() => {
+            if (Math.random() > 0.8) {
+                this.createEmojiRain();
+            }
+        }, 3000);
+    }
+
+    stopEmojiRain() {
+        if (this.emojiRainInterval) {
+            clearInterval(this.emojiRainInterval);
+            this.emojiRainInterval = null;
+        }
+    }
+
+    createEmojiRain() {
+        const emojis = ['🌟', '✨', '💫', '🎉', '🎊', '🎈', '🌈', '🦄', '🎨', '🎭', '🎪', '🎯'];
+        const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+        
+        const emojiElement = document.createElement('div');
+        emojiElement.className = 'emoji-rain';
+        emojiElement.textContent = emoji;
+        emojiElement.style.left = Math.random() * window.innerWidth + 'px';
+        emojiElement.style.animationDuration = (Math.random() * 3 + 2) + 's';
+        
+        document.body.appendChild(emojiElement);
+        
+        // 动画结束后移除元素
+        setTimeout(() => {
+            if (emojiElement.parentNode) {
+                emojiElement.parentNode.removeChild(emojiElement);
+            }
+        }, 5000);
+    }
+
+    addFunMessageEffect(messageElement) {
+        if (!this.funMode) return;
+        
+        const effects = ['fun-bounce', 'fun-shake', 'fun-wiggle', 'fun-rainbow', 'fun-heartbeat'];
+        const randomEffect = effects[Math.floor(Math.random() * effects.length)];
+        
+        messageElement.classList.add(randomEffect);
+        
+        // 添加星星效果
+        this.createSparkles(messageElement);
+        
+        // 移除动画类
+        setTimeout(() => {
+            messageElement.classList.remove(randomEffect);
+        }, 2000);
+    }
+
+    createSparkles(element) {
+        for (let i = 0; i < 5; i++) {
+            setTimeout(() => {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'sparkle';
+                sparkle.style.left = Math.random() * element.offsetWidth + 'px';
+                sparkle.style.top = Math.random() * element.offsetHeight + 'px';
+                
+                element.appendChild(sparkle);
+                
+                setTimeout(() => {
+                    if (sparkle.parentNode) {
+                        sparkle.parentNode.removeChild(sparkle);
+                    }
+                }, 1500);
+            }, i * 100);
+        }
     }
 
     initializeElements() {
@@ -171,6 +328,9 @@ class ChatApp {
         this.removeWelcomeMessage();
         this.elements.messagesContainer.appendChild(messageDiv);
         
+        // 添加趣味效果
+        this.addFunMessageEffect(messageDiv);
+        
         // Add reaction functionality
         this.addMessageReactions(message.id);
     }
@@ -216,25 +376,102 @@ class ChatApp {
 
     generateAutoResponse() {
         const responses = [
-            "这是一个很有趣的问题！让我仔细思考一下...",
-            "我理解您的意思。从我的角度来看...",
-            "感谢您的分享！这让我想到了...",
-            "您说得对，我完全同意这个观点。",
-            "这个话题很值得深入探讨。",
-            "我能感受到您的热情！请继续说下去吧。",
-            "这确实是个复杂的问题，需要仔细考虑。",
-            "您的见解很独特，我学到了很多。",
-            "让我们从另一个角度来看看这个问题。",
-            "很高兴能和您讨论这个话题！",
-            "您的问题很有深度，让我来详细回答。",
-            "根据我的理解，情况是这样的...",
-            "这是一个很好的观察！",
-            "我明白您的担忧了。",
-            "让我为您详细解释一下。"
+            // 俏皮回应
+            "哇！这个问题好有趣~ 让我想想... 🤔",
+            "嘿嘿，你问到点子上了！我觉得是这样的... 😄",
+            "哎呀，这个问题让我想起了昨天看到的一个有趣的事情！",
+            "让我用我的超级大脑来分析一下... 🧠✨",
+            "这个问题很有深度！不过我觉得我们可以用更简单的方式来看待它~",
+            
+            // 幽默回应
+            "这个问题嘛... 我觉得答案可能藏在冰箱里！🍔",
+            "让我查查我的数据库... 哦等等，我好像把密码忘了！😅",
+            "你知道吗？这个问题让我想起了我奶奶的菜谱！",
+            "这个问题好难啊... 我需要喝杯咖啡才能回答！☕",
+            "让我想想... 如果我是你，我会先吃个冰淇淋再思考这个问题！🍦",
+            
+            // 互动回应
+            "这个问题很有意思！不过我想先听听你的看法？",
+            "嗯... 你猜猜我会怎么回答？😉",
+            "让我反问你一个问题：如果你是我，你会怎么回答？",
+            "这个问题让我好奇！你是怎么想到这个问题的？",
+            "哇，你的思维方式很特别！能告诉我更多吗？",
+            
+            // 活泼回应
+            "叮咚！你的专属AI助手上线！🎉 这个问题我来啦~",
+            "收到！正在启动我的智慧模式... 🚀",
+            "这个问题让我兴奋起来了！来吧，让我们深入聊聊！",
+            "太棒了！我喜欢这种有挑战性的问题！💪",
+            "这个问题让我的CPU都在发热了！🔥",
+            
+            // 温暖回应
+            "你这个问题问得真好，让我感觉很温暖呢~ 💝",
+            "和你聊天真的很开心！这个问题我们慢慢聊~",
+            "我觉得你是个很有想法的人！这个问题很有深度~",
+            "每次和你聊天，我都能学到新东西！谢谢你~",
+            "你的问题让我觉得世界真美好！🌈",
+            
+            // 创意回应
+            "让我用诗意的语言来回答：这个问题如星辰般闪耀... ✨",
+            "如果这个问题是一首歌，那它一定是首摇滚乐！🎸",
+            "这个问题像一杯好茶，需要慢慢品味~ 🍵",
+            "让我用画画的方式来思考... 🎨 这个问题的色彩很丰富！",
+            "这个问题让我想起了春天的第一朵花！🌸",
+            
+            // 游戏化回应
+            "答对了！奖励你一朵小红花！🌺 等等，这不是考试... 😅",
+            "这个问题让我想玩个游戏！我们来玩问答游戏怎么样？🎮",
+            "Level Up! 你的问题让我升级了！⬆️",
+            "解锁新成就：提出了一个有趣的问题！🏆",
+            "这个问题让我想起了猜谜语！谜底是... 答案在你心里！💝",
+            
+            // 趣味游戏互动
+            "我们来玩个游戏吧！你问我一个问题，我回答后，我也要问你一个！😊",
+            "这个问题让我想到了一个有趣的游戏：20个问题！你想玩吗？🎲",
+            "让我猜猜你在想什么... 嗯... 是不是关于... 🤔 猜对了吗？",
+            "这个问题让我想起了成语接龙！我先来：一帆风顺！你的呢？🎯",
+            "我们来玩个文字游戏吧！用你的问题最后一个字开头说一个词！🎪"
         ];
         
-        const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-        this.addMessage(randomResponse, 'other');
+        // 根据消息内容选择合适的回应类型
+        const userMessage = this.messages[this.messages.length - 1]?.text || '';
+        let selectedResponse;
+        
+        // 检查是否要启动小游戏
+        if (this.shouldStartGame(userMessage)) {
+            selectedResponse = this.startMiniGame(userMessage);
+        } else if (userMessage.includes('你') || userMessage.includes('吗') || userMessage.includes('？')) {
+            // 问题类消息
+            selectedResponse = responses[Math.floor(Math.random() * 15)]; // 前15个是互动回应
+        } else if (userMessage.includes('谢谢') || userMessage.includes('谢')) {
+            // 感谢类消息
+            selectedResponse = "不用谢！能帮到你我很开心~ 😊 你还有其他想聊的吗？";
+        } else if (userMessage.includes('再见') || userMessage.includes('拜拜')) {
+            // 告别类消息
+            selectedResponse = "再见啦！期待下次和你聊天！记得想我哦~ 👋💕";
+        } else {
+            // 其他消息
+            selectedResponse = responses[Math.floor(Math.random() * responses.length)];
+        }
+        
+        this.addMessage(selectedResponse, 'other');
+    }
+
+    shouldStartGame(message) {
+        const gameKeywords = ['游戏', '玩', '猜', '谜语', '成语', '接龙', '20个问题'];
+        return gameKeywords.some(keyword => message.includes(keyword));
+    }
+
+    startMiniGame(userMessage) {
+        const games = [
+            "太好了！我们来玩猜谜语游戏吧！我先出一个：什么东西越洗越脏？🤔",
+            "成语接龙开始！我先来：一帆风顺！该你了！🎯",
+            "20个问题游戏！你想一个东西，我可以用20个是/否问题来猜出来！准备好了吗？🎲",
+            "文字游戏！用'聊天'的最后一个字'天'开头说一个词！我先来：天空！☁️",
+            "猜数字游戏！我想了一个1-100的数字，你来猜！🎯"
+        ];
+        
+        return games[Math.floor(Math.random() * games.length)];
     }
 
     showTypingIndicator() {
