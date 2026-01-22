@@ -8,6 +8,14 @@ class ChatApp {
         this.funMode = false;
         this.emojiRainInterval = null;
         
+        // 对话流程控制
+        this.isAiResponding = false;
+        this.userMessageQueue = [];
+        this.aiResponseQueue = [];
+        this.currentAiResponse = null;
+        this.conversationCount = 0;
+        this.lastUserMessageTime = 0;
+        
         this.initializeElements();
         this.bindEvents();
         this.loadSettings();
@@ -215,6 +223,15 @@ class ChatApp {
         this.elements.voiceBtn.addEventListener('mouseup', this.stopVoiceRecording.bind(this));
         this.elements.voiceBtn.addEventListener('mouseleave', this.stopVoiceRecording.bind(this));
         
+        // 聊天提示按钮事件
+        document.querySelectorAll('.prompt-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const prompt = e.target.getAttribute('data-prompt');
+                this.elements.messageInput.value = prompt;
+                this.sendMessage();
+            });
+        });
+        
         // Emoji picker events
         document.querySelectorAll('.emoji-item').forEach(item => {
             item.addEventListener('click', (e) => this.selectEmoji(e.target.textContent));
@@ -291,11 +308,29 @@ class ChatApp {
         
         if (messageText === '') return;
         
+        // 如果AI正在回应，将用户消息加入队列
+        if (this.isAiResponding) {
+            this.userMessageQueue.push(messageText);
+            this.showMessageQueueIndicator();
+            this.elements.messageInput.value = '';
+            this.elements.charCount.textContent = '0 / 2000';
+            this.elements.sendBtn.disabled = true;
+            this.autoResizeTextarea();
+            return;
+        }
+        
         this.addMessage(messageText, 'user');
         this.elements.messageInput.value = '';
         this.elements.charCount.textContent = '0 / 2000';
         this.elements.sendBtn.disabled = true;
         this.autoResizeTextarea();
+        
+        // 更新对话统计
+        this.conversationCount++;
+        this.lastUserMessageTime = Date.now();
+        
+        // 检查是否需要防尬聊提示
+        this.checkAwkwardConversation();
         
         this.simulateOtherPersonTyping();
     }
@@ -364,14 +399,44 @@ class ChatApp {
     }
 
     simulateOtherPersonTyping() {
+        // 设置AI正在回应状态
+        this.isAiResponding = true;
+        this.showAiStatus('thinking', 'AI正在思考中...');
+        
         this.showTypingIndicator();
         
         const responseDelay = Math.random() * 2000 + 1000;
         
         this.autoResponseTimeout = setTimeout(() => {
             this.hideTypingIndicator();
+            this.showAiStatus('responding', 'AI正在回复...');
             this.generateAutoResponse();
         }, responseDelay);
+    }
+
+    showAiStatus(status, text) {
+        // 移除现有状态指示器
+        const existingIndicator = document.querySelector('.ai-status-indicator');
+        if (existingIndicator) {
+            existingIndicator.remove();
+        }
+
+        const indicator = document.createElement('div');
+        indicator.className = `ai-status-indicator active ${status}`;
+        indicator.innerHTML = `
+            <div class="status-dot"></div>
+            <span>${text}</span>
+        `;
+
+        this.elements.messagesContainer.appendChild(indicator);
+        this.scrollToBottom();
+    }
+
+    hideAiStatus() {
+        const indicator = document.querySelector('.ai-status-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
     }
 
     generateAutoResponse() {
@@ -455,6 +520,143 @@ class ChatApp {
         }
         
         this.addMessage(selectedResponse, 'other');
+        
+        // AI回应完成后的处理
+        setTimeout(() => {
+            this.hideAiStatus();
+            this.isAiResponding = false;
+            
+            // 处理队列中的用户消息
+            this.processMessageQueue();
+        }, 500);
+    }
+
+    processMessageQueue() {
+        if (this.userMessageQueue.length > 0) {
+            const nextMessage = this.userMessageQueue.shift();
+            
+            // 隐藏队列指示器
+            this.hideMessageQueueIndicator();
+            
+            // 延迟一点再处理下一条消息，让用户看到AI回应完成
+            setTimeout(() => {
+                this.addMessage(nextMessage, 'user');
+                
+                // 更新对话统计
+                this.conversationCount++;
+                this.lastUserMessageTime = Date.now();
+                
+                // 继续处理队列或开始新的AI回应
+                if (this.userMessageQueue.length > 0) {
+                    this.showMessageQueueIndicator();
+                    setTimeout(() => {
+                        this.simulateOtherPersonTyping();
+                    }, 1000);
+                } else {
+                    setTimeout(() => {
+                        this.simulateOtherPersonTyping();
+                    }, 1000);
+                }
+            }, 800);
+        }
+    }
+
+    showMessageQueueIndicator() {
+        const queueCount = this.userMessageQueue.length;
+        if (queueCount > 0) {
+            // 显示队列指示器
+            const lastMessage = this.messages[this.messages.length - 1];
+            if (lastMessage) {
+                let indicator = lastMessage.querySelector('.message-queue-indicator');
+                if (!indicator) {
+                    indicator = document.createElement('div');
+                    indicator.className = 'message-queue-indicator';
+                    lastMessage.appendChild(indicator);
+                }
+                indicator.textContent = queueCount;
+                indicator.classList.add('show');
+            }
+        }
+    }
+
+    hideMessageQueueIndicator() {
+        const indicators = document.querySelectorAll('.message-queue-indicator');
+        indicators.forEach(indicator => {
+            indicator.classList.remove('show');
+        });
+    }
+
+    checkAwkwardConversation() {
+        // 检查是否出现尬聊情况
+        const recentMessages = this.messages.slice(-5);
+        const userMessages = recentMessages.filter(msg => msg.sender === 'user');
+        
+        // 如果用户连续发送很短的消息，可能不知道说什么
+        if (userMessages.length >= 3) {
+            const shortMessages = userMessages.filter(msg => msg.text.length < 10);
+            if (shortMessages.length >= 2) {
+                this.showAwkwardHint();
+                return;
+            }
+        }
+        
+        // 如果对话次数很少，提供更多建议
+        if (this.conversationCount <= 2 && this.messages.length <= 4) {
+            setTimeout(() => {
+                this.showConversationSuggestions();
+            }, 3000);
+        }
+    }
+
+    showAwkwardHint() {
+        const hint = document.createElement('div');
+        hint.className = 'awkward-hint';
+        hint.innerHTML = `
+            <div class="hint-text">💭 感觉不知道说什么了吗？试试这些话题：</div>
+            <div class="hint-suggestions">
+                <button class="hint-btn" onclick="chatApp.sendSuggestion('分享一个你今天遇到的有趣事情')">分享趣事</button>
+                <button class="hint-btn" onclick="chatApp.sendSuggestion('你最喜欢什么季节？为什么？')">聊季节</button>
+                <button class="hint-btn" onclick="chatApp.sendSuggestion('如果可以拥有一个超能力，你想要什么？')">超能力</button>
+                <button class="hint-btn" onclick="chatApp.sendSuggestion('推荐一本好书或好电影')">推荐</button>
+            </div>
+        `;
+        
+        this.elements.messagesContainer.appendChild(hint);
+        this.scrollToBottom();
+        
+        // 10秒后自动移除
+        setTimeout(() => {
+            if (hint.parentNode) {
+                hint.remove();
+            }
+        }, 10000);
+    }
+
+    showConversationSuggestions() {
+        if (this.messages.length > 6) return; // 已经有对话了，不需要建议
+        
+        const suggestions = [
+            "想听听我的故事吗？我可以讲个有趣的！😊",
+            "我们来玩个游戏吧！猜谜语怎么样？🎮",
+            "你知道我最喜欢什么颜色吗？猜猜看！🎨",
+            "如果可以去任何地方旅行，你想去哪里？✈️",
+            "分享一个你的小秘密吧，我不会告诉别人的！🤫"
+        ];
+        
+        const randomSuggestion = suggestions[Math.floor(Math.random() * suggestions.length)];
+        
+        setTimeout(() => {
+            this.addMessage(randomSuggestion, 'other');
+        }, 2000);
+    }
+
+    sendSuggestion(text) {
+        this.elements.messageInput.value = text;
+        this.sendMessage();
+        
+        // 移除防尬聊提示
+        const hints = document.querySelectorAll('.awkward-hint');
+        hints.forEach(hint => hint.remove());
     }
 
     shouldStartGame(message) {
