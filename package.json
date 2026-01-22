@@ -1,0 +1,49 @@
+{
+  "name": "chat-website",
+  "version": "1.0.0",
+  "description": "现代化的对话网站，支持实时聊天、语音消息、表情反应和双语功能",
+  "main": "index.html",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "api": "node api-server.js",
+    "build": "echo 'Build completed'",
+    "deploy": "node auto-push.js"
+  },
+  "keywords": [
+    "chat",
+    "ai",
+    "bilingual",
+    "translation",
+    "voice",
+    "emoji",
+    "pwa",
+    "api"
+  ],
+  "author": "Chat Website Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "node": "^18.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NealGoldner/chat-app.git"
+  },
+  "homepage": "https://chat-app-86l.pages.dev",
+  "bugs": {
+    "url": "https://github.com/NealGoldner/chat-app/issues"
+  },
+  "config": {
+    "API_KEY": "REQUIRED_FOR_API_ACCESS",
+    "API_BASE_URL": "http://localhost:3001/api",
+    "description": "后端API服务配置，API_KEY用于保护API接口"
+  }
+}

@@ -20,21 +20,94 @@ class ChatApp {
         this.bilingualMode = true;
         this.translationCache = new Map();
         
+        // API配置
+        this.apiBaseUrl = 'http://localhost:3001/api';
+        this.apiKey = null;
+        
         this.initializeElements();
         this.bindEvents();
         this.loadSettings();
         this.initializeChat();
         this.initFunMode();
+        this.loadApiConfig();
     }
 
-    initFunMode() {
-        // 随机启动趣味模式
-        if (Math.random() > 0.7) {
-            this.enableFunMode();
+    loadApiConfig() {
+        // 从localStorage加载API配置
+        const savedConfig = localStorage.getItem('apiConfig');
+        if (savedConfig) {
+            const config = JSON.parse(savedConfig);
+            this.apiKey = config.apiKey;
+            this.apiBaseUrl = config.baseUrl || 'http://localhost:3001/api';
         }
         
-        // 添加趣味模式切换按钮
-        this.addFunModeToggle();
+        // 从package.json获取默认配置
+        if (!this.apiKey) {
+            // 尝试从环境变量获取
+            this.apiKey = this.getApiKeyFromPackage() || 'demo_key';
+        }
+    }
+
+    getApiKeyFromPackage() {
+        // 这里应该从后端获取，暂时返回演示密钥
+        return 'demo_key';
+    }
+
+    async callApi(endpoint, data = {}) {
+        try {
+            const url = `${this.apiBaseUrl}${endpoint}`;
+            const options = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(this.apiKey && { 'X-API-Key': this.apiKey })
+                },
+                body: JSON.stringify(data)
+            };
+
+            const response = await fetch(url, options);
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'API call failed');
+            }
+            
+            return result;
+        } catch (error) {
+            console.error('API call failed:', error);
+            // 降级到本地模拟
+            return this.getFallbackResponse(endpoint, data);
+        }
+    }
+
+    getFallbackResponse(endpoint, data) {
+        // API失败时的降级处理
+        if (endpoint === '/chat') {
+            const responses = [
+                "哇！这个问题好有趣~ 让我想想... 🤔",
+                "嘿嘿，你问到点子上了！我觉得是这样的... 😄",
+                "哎呀，这个问题让我想起了昨天看到的一个有趣的事情！",
+                "让我用我的超级大脑来分析一下... 🧠✨"
+            ];
+            return {
+                success: true,
+                response: responses[Math.floor(Math.random() * responses.length)],
+                timestamp: new Date().toISOString()
+            };
+        }
+        
+        if (endpoint === '/translate') {
+            return {
+                success: true,
+                originalText: data.text,
+                translatedText: `[中文] ${data.text}`,
+                from: data.from || 'en',
+                to: data.to || 'zh',
+                timestamp: new Date().toISOString()
+            };
+        }
+        
+        return { success: false, error: 'Endpoint not supported' };
     }
 
     addFunModeToggle() {
@@ -477,6 +550,28 @@ class ChatApp {
     }
 
     generateAutoResponse() {
+        // 使用API调用而不是本地模拟
+        this.callApi('/chat', { message: this.messages[this.messages.length - 1]?.text || '' })
+            .then(result => {
+                this.addMessage(result.response, 'other');
+                
+                // AI回应完成后的处理
+                setTimeout(() => {
+                    this.hideAiStatus();
+                    this.isAiResponding = false;
+                    
+                    // 处理队列中的用户消息
+                    this.processMessageQueue();
+                }, 500);
+            })
+            .catch(error => {
+                console.error('AI API call failed:', error);
+                // 降级到本地模拟
+                this.generateLocalResponse();
+            });
+    }
+
+    generateLocalResponse() {
         const responses = [
             // 俏皮回应
             "哇！这个问题好有趣~ 让我想想... 🤔",
@@ -762,14 +857,18 @@ class ChatApp {
         translationSection.innerHTML = '<div class="translation-loading">正在翻译...</div>';
         
         try {
-            // 模拟翻译API调用
-            const translation = await this.simulateTranslation(message.text);
+            // 使用API进行翻译
+            const result = await this.callApi('/translate', {
+                text: message.text,
+                from: 'en',
+                to: 'zh'
+            });
             
             // 缓存翻译结果
-            this.translationCache.set(cacheKey, translation);
+            this.translationCache.set(cacheKey, result.translatedText);
             
             // 显示翻译
-            this.displayTranslation(translationSection, translation, translateBtn);
+            this.displayTranslation(translationSection, result.translatedText, translateBtn);
             
         } catch (error) {
             console.error('Translation failed:', error);
