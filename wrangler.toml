@@ -1,0 +1,22 @@
+name = "chat-website"
+main = "src/worker.js"
+compatibility_date = "2024-01-01"
+
+[env.production]
+name = "chat-website-prod"
+
+[env.staging]
+name = "chat-website-staging"
+
+[[env.production.routes]]
+pattern = "*your-domain.com/*"
+zone_name = "your-domain.com"
+
+[build]
+command = ""
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
