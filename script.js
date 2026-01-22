@@ -1017,17 +1017,16 @@ class ChatApp {
     }
 
     clearChat() {
-        if (confirm('确定要清空所有聊天记录吗？此操作无法撤销。')) {
-            this.messages = [];
-            this.elements.messagesContainer.innerHTML = '';
-            this.addWelcomeMessage();
-            this.showNotification('聊天记录已清空');
-        }
+        // 直接清空聊天，无需确认
+        this.messages = [];
+        this.elements.messagesContainer.innerHTML = '';
+        this.addWelcomeMessage();
+        this.showNotification('聊天记录已清空');
     }
 
     startVoiceRecording() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            alert('您的浏览器不支持语音录制功能');
+            this.showNotification('您的浏览器不支持语音录制功能');
             return;
         }
 
@@ -1051,7 +1050,7 @@ class ChatApp {
             })
             .catch(error => {
                 console.error('Error accessing microphone:', error);
-                alert('无法访问麦克风，请检查权限设置');
+                this.showNotification('无法访问麦克风，请检查权限设置');
             });
     }
 
