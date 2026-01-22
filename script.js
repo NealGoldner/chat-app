@@ -28,7 +28,15 @@ class ChatApp {
             notificationsCheckbox: document.getElementById('notifications'),
             userInitial: document.getElementById('user-initial'),
             emojiBtn: document.getElementById('emoji-btn'),
-            attachBtn: document.getElementById('attach-btn')
+            attachBtn: document.getElementById('attach-btn'),
+            searchBtn: document.getElementById('search-btn'),
+            clearBtn: document.getElementById('clear-btn'),
+            searchContainer: document.getElementById('search-container'),
+            searchInput: document.getElementById('search-input'),
+            closeSearchBtn: document.getElementById('close-search-btn'),
+            searchResults: document.getElementById('search-results'),
+            voiceBtn: document.getElementById('voice-btn'),
+            emojiPicker: document.getElementById('emoji-picker')
         };
     }
 
@@ -39,8 +47,27 @@ class ChatApp {
         this.elements.settingsBtn.addEventListener('click', this.openSettings.bind(this));
         this.elements.closeSettings.addEventListener('click', this.closeSettings.bind(this));
         this.elements.saveSettings.addEventListener('click', this.saveSettings.bind(this));
-        this.elements.emojiBtn.addEventListener('click', this.insertEmoji.bind(this));
+        this.elements.emojiBtn.addEventListener('click', this.toggleEmojiPicker.bind(this));
         this.elements.attachBtn.addEventListener('click', this.handleAttachment.bind(this));
+        this.elements.searchBtn.addEventListener('click', this.toggleSearch.bind(this));
+        this.elements.clearBtn.addEventListener('click', this.clearChat.bind(this));
+        this.elements.closeSearchBtn.addEventListener('click', this.closeSearch.bind(this));
+        this.elements.searchInput.addEventListener('input', this.handleSearch.bind(this));
+        this.elements.voiceBtn.addEventListener('mousedown', this.startVoiceRecording.bind(this));
+        this.elements.voiceBtn.addEventListener('mouseup', this.stopVoiceRecording.bind(this));
+        this.elements.voiceBtn.addEventListener('mouseleave', this.stopVoiceRecording.bind(this));
+        
+        // Emoji picker events
+        document.querySelectorAll('.emoji-item').forEach(item => {
+            item.addEventListener('click', (e) => this.selectEmoji(e.target.textContent));
+        });
+        
+        // Click outside to close emoji picker
+        document.addEventListener('click', (e) => {
+            if (!this.elements.emojiPicker.contains(e.target) && e.target !== this.elements.emojiBtn) {
+                this.elements.emojiPicker.style.display = 'none';
+            }
+        });
         
         this.elements.settingsModal.addEventListener('click', (e) => {
             if (e.target === this.elements.settingsModal) {
@@ -131,15 +158,48 @@ class ChatApp {
     renderMessage(message) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${message.sender}`;
+        messageDiv.setAttribute('data-message-id', message.id);
         messageDiv.innerHTML = `
             <div class="message-content">
                 <div class="message-text">${this.escapeHtml(message.text)}</div>
                 <span class="message-time">${this.formatTime(message.timestamp)}</span>
+                <div class="message-reactions" id="reactions-${message.id}"></div>
             </div>
         `;
         
         this.removeWelcomeMessage();
         this.elements.messagesContainer.appendChild(messageDiv);
+        
+        // Add reaction functionality
+        this.addMessageReactions(message.id);
+    }
+
+    addMessageReactions(messageId) {
+        const reactionsContainer = document.getElementById(`reactions-${messageId}`);
+        const commonReactions = ['❤️', '👍', '😂', '🎉', '😍'];
+        
+        commonReactions.forEach(emoji => {
+            const reaction = document.createElement('span');
+            reaction.className = 'reaction';
+            reaction.textContent = emoji;
+            reaction.addEventListener('click', () => this.toggleReaction(messageId, emoji, reaction));
+            reactionsContainer.appendChild(reaction);
+        });
+    }
+
+    toggleReaction(messageId, emoji, element) {
+        element.classList.toggle('active');
+        
+        // Store reaction data (in a real app, this would be sent to a server)
+        const message = this.messages.find(msg => msg.id === messageId);
+        if (message) {
+            if (!message.reactions) message.reactions = {};
+            message.reactions[emoji] = element.classList.contains('active');
+        }
+        
+        // Show notification
+        const action = element.classList.contains('active') ? '添加了' : '移除了';
+        this.showNotification(`${action}反应 ${emoji}`);
     }
 
     simulateOtherPersonTyping() {
@@ -220,20 +280,181 @@ class ChatApp {
         return div.innerHTML;
     }
 
-    insertEmoji() {
-        const emojis = ['😊', '😂', '❤️', '👍', '🎉', '🤔', '😍', '🙏', '💪', '✨'];
-        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-        
+    toggleEmojiPicker() {
+        const picker = this.elements.emojiPicker;
+        picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+        if (picker.style.display === 'block') {
+            this.elements.searchInput.focus();
+        }
+    }
+
+    selectEmoji(emoji) {
         const cursorPosition = this.elements.messageInput.selectionStart;
         const currentValue = this.elements.messageInput.value;
-        const newValue = currentValue.slice(0, cursorPosition) + randomEmoji + currentValue.slice(cursorPosition);
+        const newValue = currentValue.slice(0, cursorPosition) + emoji + currentValue.slice(cursorPosition);
         
         this.elements.messageInput.value = newValue;
-        this.elements.messageInput.selectionStart = cursorPosition + randomEmoji.length;
-        this.elements.messageInput.selectionEnd = cursorPosition + randomEmoji.length;
+        this.elements.messageInput.selectionStart = cursorPosition + emoji.length;
+        this.elements.messageInput.selectionEnd = cursorPosition + emoji.length;
         
         this.handleInputChange({ target: this.elements.messageInput });
+        this.elements.emojiPicker.style.display = 'none';
         this.elements.messageInput.focus();
+    }
+
+    toggleSearch() {
+        const searchContainer = this.elements.searchContainer;
+        const isVisible = searchContainer.style.display !== 'none';
+        
+        if (isVisible) {
+            this.closeSearch();
+        } else {
+            searchContainer.style.display = 'block';
+            this.elements.searchInput.focus();
+        }
+    }
+
+    closeSearch() {
+        this.elements.searchContainer.style.display = 'none';
+        this.elements.searchInput.value = '';
+        this.elements.searchResults.innerHTML = '';
+    }
+
+    handleSearch(e) {
+        const query = e.target.value.toLowerCase().trim();
+        
+        if (query === '') {
+            this.elements.searchResults.innerHTML = '';
+            return;
+        }
+
+        const results = this.messages.filter(msg => 
+            msg.text.toLowerCase().includes(query)
+        );
+
+        this.displaySearchResults(results, query);
+    }
+
+    displaySearchResults(results, query) {
+        const resultsContainer = this.elements.searchResults;
+        
+        if (results.length === 0) {
+            resultsContainer.innerHTML = '<div class="search-result-item">没有找到匹配的消息</div>';
+            return;
+        }
+
+        resultsContainer.innerHTML = results.map(msg => `
+            <div class="search-result-item" data-message-id="${msg.id}">
+                <span class="result-text">${this.highlightSearchTerm(msg.text, query)}</span>
+                <span class="result-time">${this.formatTime(msg.timestamp)}</span>
+            </div>
+        `).join('');
+
+        // Add click events to search results
+        resultsContainer.querySelectorAll('.search-result-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const messageId = parseInt(item.dataset.messageId);
+                this.scrollToMessage(messageId);
+                this.closeSearch();
+            });
+        });
+    }
+
+    highlightSearchTerm(text, term) {
+        const regex = new RegExp(`(${term})`, 'gi');
+        return text.replace(regex, '<mark>$1</mark>');
+    }
+
+    scrollToMessage(messageId) {
+        const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+        if (messageElement) {
+            messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            messageElement.style.backgroundColor = 'var(--warning-color)';
+            setTimeout(() => {
+                messageElement.style.backgroundColor = '';
+            }, 2000);
+        }
+    }
+
+    clearChat() {
+        if (confirm('确定要清空所有聊天记录吗？此操作无法撤销。')) {
+            this.messages = [];
+            this.elements.messagesContainer.innerHTML = '';
+            this.addWelcomeMessage();
+            this.showNotification('聊天记录已清空');
+        }
+    }
+
+    startVoiceRecording() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('您的浏览器不支持语音录制功能');
+            return;
+        }
+
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                this.mediaRecorder = new MediaRecorder(stream);
+                this.audioChunks = [];
+                
+                this.mediaRecorder.ondataavailable = (event) => {
+                    this.audioChunks.push(event.data);
+                };
+                
+                this.mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
+                    this.handleVoiceMessage(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                this.mediaRecorder.start();
+                this.showVoiceRecordingIndicator();
+            })
+            .catch(error => {
+                console.error('Error accessing microphone:', error);
+                alert('无法访问麦克风，请检查权限设置');
+            });
+    }
+
+    stopVoiceRecording() {
+        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+            this.mediaRecorder.stop();
+            this.hideVoiceRecordingIndicator();
+        }
+    }
+
+    showVoiceRecordingIndicator() {
+        const indicator = document.createElement('div');
+        indicator.className = 'voice-recording';
+        indicator.innerHTML = `
+            <div class="recording-dot"></div>
+            <span>正在录制...</span>
+        `;
+        indicator.id = 'voice-recording-indicator';
+        
+        this.elements.inputContainer.appendChild(indicator);
+    }
+
+    hideVoiceRecordingIndicator() {
+        const indicator = document.getElementById('voice-recording-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    }
+
+    handleVoiceMessage(audioBlob) {
+        // Convert audio to base64 for storage
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64Audio = reader.result;
+            const message = `🎵 语音消息 (${this.formatFileSize(audioBlob.size)})`;
+            this.addMessage(message, 'user');
+            
+            // Simulate response to voice message
+            setTimeout(() => {
+                this.simulateOtherPersonTyping();
+            }, 1000);
+        };
+        reader.readAsDataURL(audioBlob);
     }
 
     handleAttachment() {
