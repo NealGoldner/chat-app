@@ -1,10 +1,16 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const DeployConfig = require('./deploy-config');
+
+// 初始化部署配置
+const deployConfig = new DeployConfig();
+const config = deployConfig.getConfig();
+
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || config.PORT || 3001;
 
 // 中间件
 app.use(cors());
@@ -136,22 +142,7 @@ app.get('/api/health', (req, res) => {
 
 // API密钥验证中间件
 function validateApiKey(req, res, next) {
-    const apiKey = req.headers['x-api-key'];
-    const validApiKey = process.env.API_KEY;
-    
-    if (!validApiKey) {
-        // 如果没有设置API_KEY，则跳过验证
-        return next();
-    }
-    
-    if (apiKey !== validApiKey) {
-        return res.status(401).json({
-            success: false,
-            error: 'Invalid API key'
-        });
-    }
-    
-    next();
+    return deployConfig.validateApiKey(req, res, next);
 }
 
 // 应用API密钥验证到需要保护的接口
