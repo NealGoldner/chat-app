@@ -487,6 +487,97 @@ body {
     background: var(--primary-hover, #0056b3);
 }
 
+/* 麦克风权限指南 */
+.microphone-guide {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.3s ease;
+}
+
+.guide-content {
+    background: var(--bg-primary);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 400px;
+    margin: 20px;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-color);
+}
+
+.guide-content h4 {
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+    font-size: 18px;
+    text-align: center;
+}
+
+.guide-steps {
+    margin-bottom: 20px;
+}
+
+.step {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.step strong {
+    color: var(--primary-color);
+}
+
+.guide-close {
+    width: 100%;
+    padding: 10px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.guide-close:hover {
+    background: var(--primary-hover, #0056b3);
+}
+
+/* 麦克风按钮状态 */
+.btn-icon.mic-allowed {
+    color: var(--success-color, #28a745);
+}
+
+.btn-icon.mic-denied {
+    color: var(--danger-color, #dc3545);
+    animation: pulse 2s infinite;
+}
+
+.btn-icon.mic-prompt {
+    color: var(--warning-color, #ffc107);
+}
+
+.btn-icon.mic-unsupported {
+    color: var(--text-muted);
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-icon.mic-denied:hover {
+    color: var(--danger-color, #dc3545);
+    transform: scale(1.1);
+}
+
 /* 中国区浏览器优化 */
 .chat-container {
     width: 100%;

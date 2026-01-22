@@ -284,6 +284,59 @@ class ChatApp {
             bilingualModeCheckbox: document.getElementById('bilingual-mode'),
             headerActions: document.querySelector('.header-actions')
         };
+        
+        // 检查麦克风状态
+        this.checkMicrophoneStatus();
+    }
+
+    async checkMicrophoneStatus() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            this.updateVoiceButtonStatus('unsupported');
+            return;
+        }
+
+        try {
+            // 检查权限状态
+            const permission = await navigator.permissions.query({ name: 'microphone' });
+            this.updateVoiceButtonStatus(permission.state);
+            
+            // 监听权限变化
+            permission.addEventListener('change', () => {
+                this.updateVoiceButtonStatus(permission.state);
+            });
+            
+        } catch (error) {
+            // 某些浏览器不支持权限查询
+            this.updateVoiceButtonStatus('unknown');
+        }
+    }
+
+    updateVoiceButtonStatus(status) {
+        if (!this.elements.voiceBtn) return;
+        
+        // 移除所有状态类
+        this.elements.voiceBtn.classList.remove('mic-allowed', 'mic-denied', 'mic-prompt', 'mic-unsupported');
+        
+        switch (status) {
+            case 'granted':
+                this.elements.voiceBtn.classList.add('mic-allowed');
+                this.elements.voiceBtn.title = '语音消息 (已授权)';
+                break;
+            case 'denied':
+                this.elements.voiceBtn.classList.add('mic-denied');
+                this.elements.voiceBtn.title = '语音消息 (权限被拒绝，点击查看设置指南)';
+                break;
+            case 'prompt':
+                this.elements.voiceBtn.classList.add('mic-prompt');
+                this.elements.voiceBtn.title = '语音消息 (需要授权)';
+                break;
+            case 'unsupported':
+                this.elements.voiceBtn.classList.add('mic-unsupported');
+                this.elements.voiceBtn.title = '语音消息 (浏览器不支持)';
+                break;
+            default:
+                this.elements.voiceBtn.title = '语音消息';
+        }
     }
 
     bindEvents() {
@@ -1124,33 +1177,140 @@ class ChatApp {
     }
 
     startVoiceRecording() {
+        // 检查浏览器支持
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            this.showNotification('您的浏览器不支持语音录制功能');
+            this.showNotification('您的浏览器不支持语音录制功能，请使用Chrome、Edge或Firefox浏览器');
             return;
         }
 
-        navigator.mediaDevices.getUserMedia({ audio: true })
-            .then(stream => {
-                this.mediaRecorder = new MediaRecorder(stream);
-                this.audioChunks = [];
-                
-                this.mediaRecorder.ondataavailable = (event) => {
-                    this.audioChunks.push(event.data);
-                };
-                
-                this.mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
-                    this.handleVoiceMessage(audioBlob);
-                    stream.getTracks().forEach(track => track.stop());
-                };
-                
-                this.mediaRecorder.start();
-                this.showVoiceRecordingIndicator();
-            })
-            .catch(error => {
-                console.error('Error accessing microphone:', error);
-                this.showNotification('无法访问麦克风，请检查权限设置');
+        // 检查HTTPS
+        if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            this.showNotification('语音录制需要HTTPS连接，请使用 https:// 或在 localhost 上运行');
+            return;
+        }
+
+        // 请求麦克风权限
+        this.requestMicrophonePermission();
+    }
+
+    async requestMicrophonePermission() {
+        try {
+            // 先检查权限状态
+            const permission = await navigator.permissions.query({ name: 'microphone' });
+            
+            if (permission.state === 'denied') {
+                this.showNotification('麦克风权限被拒绝，请在浏览器设置中允许麦克风访问');
+                this.showMicrophonePermissionGuide();
+                return;
+            }
+
+            // 请求麦克风访问
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
             });
+
+            this.setupVoiceRecorder(stream);
+
+        } catch (error) {
+            console.error('Microphone access error:', error);
+            this.handleMicrophoneError(error);
+        }
+    }
+
+    setupVoiceRecorder(stream) {
+        try {
+            this.mediaRecorder = new MediaRecorder(stream);
+            this.audioChunks = [];
+            
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    this.audioChunks.push(event.data);
+                }
+            };
+            
+            this.mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                this.handleVoiceMessage(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
+            };
+            
+            this.mediaRecorder.onerror = (event) => {
+                console.error('MediaRecorder error:', event.error);
+                this.showNotification('录音出错，请重试');
+            };
+            
+            this.mediaRecorder.start();
+            this.showVoiceRecordingIndicator();
+            
+        } catch (error) {
+            console.error('Voice recorder setup error:', error);
+            this.showNotification('语音录制器初始化失败');
+        }
+    }
+
+    handleMicrophoneError(error) {
+        let errorMessage = '麦克风访问失败';
+        
+        switch (error.name) {
+            case 'NotAllowedError':
+                errorMessage = '麦克风权限被拒绝，请点击地址栏左侧图标允许麦克风访问';
+                this.showMicrophonePermissionGuide();
+                break;
+            case 'NotFoundError':
+                errorMessage = '未找到麦克风设备，请检查麦克风连接';
+                break;
+            case 'NotSupportedError':
+                errorMessage = '浏览器不支持语音录制，请升级浏览器';
+                break;
+            case 'NotReadableError':
+                errorMessage = '麦克风被其他应用占用，请关闭其他应用后重试';
+                break;
+            case 'OverconstrainedError':
+                errorMessage = '麦克风不满足要求，请检查麦克风设置';
+                break;
+            default:
+                errorMessage = `麦克风访问错误: ${error.message}`;
+        }
+        
+        this.showNotification(errorMessage);
+    }
+
+    showMicrophonePermissionGuide() {
+        const guide = document.createElement('div');
+        guide.className = 'microphone-guide';
+        guide.innerHTML = `
+            <div class="guide-content">
+                <h4>🎤 麦克风权限设置指南</h4>
+                <div class="guide-steps">
+                    <div class="step">
+                        <strong>步骤1:</strong> 点击地址栏左侧的 🔒 或 ℹ️ 图标
+                    </div>
+                    <div class="step">
+                        <strong>步骤2:</strong> 找到"麦克风"选项
+                    </div>
+                    <div class="step">
+                        <strong>步骤3:</strong> 选择"允许"
+                    </div>
+                    <div class="step">
+                        <strong>步骤4:</strong> 刷新页面后重试
+                    </div>
+                </div>
+                <button class="guide-close" onclick="this.parentElement.parentElement.remove()">知道了</button>
+            </div>
+        `;
+        
+        document.body.appendChild(guide);
+        
+        // 10秒后自动移除
+        setTimeout(() => {
+            if (guide.parentNode) {
+                guide.remove();
+            }
+        }, 10000);
     }
 
     stopVoiceRecording() {
